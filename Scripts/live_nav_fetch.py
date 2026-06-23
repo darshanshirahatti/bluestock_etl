@@ -1,6 +1,6 @@
 import os
-import json
 import requests
+import glob
 import pandas as pd
 
 def fetch_live_nav(scheme_code, filename):
@@ -9,7 +9,7 @@ def fetch_live_nav(scheme_code, filename):
     print(f"Fetching NAV data from: {url}")
     
     try:
-        response = requests.get(url, timeout=10)
+        response = requests.get(url, timeout=15)
         response.raise_for_status() # Trigger error for bad status codes
         
         data = response.json()
@@ -18,13 +18,17 @@ def fetch_live_nav(scheme_code, filename):
         meta = data.get('meta', {})
         nav_history = data.get('data', [])
         
+        if not nav_history:
+            print(f"Warning: No historical data returned for scheme {scheme_code}")
+            return None
+            
         # Flatten data to save as a structured CSV
         df = pd.DataFrame(nav_history)
         
         # Attach meta information as standard columns for analytical utility
-        df['scheme_code'] = meta.get('scheme_code')
-        df['scheme_name'] = meta.get('scheme_name')
-        df['fund_house'] = meta.get('fund_house')
+        df['scheme_code'] = str(meta.get('scheme_code', scheme_code))
+        df['scheme_name'] = meta.get('scheme_name', '')
+        df['fund_house'] = meta.get('fund_house', '')
         
         # Ensure target directory exists
         os.makedirs("data/raw", exist_ok=True)
@@ -52,25 +56,50 @@ def fetch_key_schemes():
     for code, name in schemes.items():
         fetch_live_nav(code, name)
 
+
+
 def explore_fund_master(fund_master_path="data/raw/fund_master.csv"):
     """
-    Simulates exploring the structural setup of the mutual fund master file.
-    Note: Replace logic with your actual fund_master filename once dropped in data/raw.
+    Explores the structural setup of the mutual fund master file.
+    Dynamically searches for any file containing 'fund_master' in the data/raw folder.
     """
-    if not os.path.exists(fund_master_path):
-        print(f"\n[Note] fund_master.csv not found at {fund_master_path}. Skipping internal exploration.")
+    target_path = None
+    
+    # 1. Check the default path
+    if os.path.exists(fund_master_path):
+        target_path = fund_master_path
+    else:
+        # 2. Dynamic Search: Look for any CSV with 'fund_master' in its name inside data/raw/
+        search_pattern = os.path.join("data", "raw", "*fund_master*.csv")
+        found_files = glob.glob(search_pattern)
+        
+        if found_files:
+            target_path = found_files[0] # Grab the first match found
+        else:
+            # 3. Last Resort: Search the entire root folder just in case it was placed outside data/raw/
+            backup_pattern = os.path.join("**", "*fund_master*.csv")
+            found_files_backup = glob.glob(backup_pattern, recursive=True)
+            if found_files_backup:
+                target_path = found_files_backup[0]
+
+    if not target_path:
+        print(f"\n[!] ALERT: Could not find any fund master CSV file on your computer.")
+        print(f"Please ensure you have copied the provided '01_fund_master.csv' file into your 'data/raw/' folder.")
         return None
 
-    df = pd.read_csv(fund_master_path)
+    print(f"\n[Success] Found fund master file at: {target_path}")
+    df = pd.read_csv(target_path)
     print("\n" + "="*20 + " FUND MASTER EXPLORATION " + "="*20)
     
+    # Clean column names by stripping trailing whitespaces/newlines
+    df.columns = df.columns.str.strip()
+    
     # Unique values checks
-    for col in ['fund_house', 'category', 'sub_category', 'risk_grade']:
+    for col in ['fund_house', 'category', 'sub_category', 'risk_grade', 'risk_category']:
         if col in df.columns:
             print(f"\nUnique {col.replace('_', ' ').title()}s (Top 10):")
-            print(df[col].unique()[:10])
+            print(df[col].dropna().unique()[:10])
             
-    # AMFI Architecture validation notes
     print("\nAMFI Code Architecture Analysis:")
     print(" - Scheme codes serve as unique digital primary keys issued by AMFI.")
     print(" - Format typically presents as a 6-digit identifier (e.g., 125497).")
@@ -83,19 +112,31 @@ def validate_amfi_codes(fund_master_df, nav_history_df):
         print("Validation Skipped: Missing active dataframes for comparison metrics.")
         return
         
-    master_codes = set(fund_master_df['scheme_code'].unique())
-    history_codes = set(nav_history_df['scheme_code'].unique())
+    # Standardize column searching to accommodate variations in naming (amfi_code, AMFI Code, etc.)
+    master_col = None
+    for col in ['amfi_code', 'AMFI Code', 'scheme_code', 'Scheme Code']:
+        if col in fund_master_df.columns:
+            master_col = col
+            break
+            
+    if master_col is None:
+        print(f"Error: Could not find AMFI identifier column in Fund Master. Found columns: {list(fund_master_df.columns)}")
+        return
+
+    # Extract unique codes and turn them to strings for safe matching
+    master_codes = set(fund_master_df[master_col].astype(str).str.strip().unique())
+    history_codes = set(nav_history_df['scheme_code'].astype(str).str.strip().unique())
     
     missing_in_history = master_codes - history_codes
     
-    print(f"Total Unique Schemes in Master: {len(master_codes)}")
-    print(f"Total Unique Schemes in Historical Log: {len(history_codes)}")
+    print(f"Total Unique Schemes in Master File: {len(master_codes)}")
+    print(f"Total Unique Schemes in API Download: {len(history_codes)}")
     
     if len(missing_in_history) == 0:
         print("PASS: Referential Integrity Validated. All codes match cleanly.")
     else:
-        print(f"FAIL: Found {len(missing_in_history)} codes in master missing tracking history.")
-        print(f"Missing Codes Sample: {list(missing_in_history)[:5]}")
+        print(f"Data Profiling Note: Found {len(missing_in_history)} codes in master file that are not in this single API sample download.")
+        print(f"Sample of Master Codes: {list(master_codes)[:5]}")
 
 if __name__ == "__main__":
     # Task 4: Fetch HDFC Top 100 Direct live NAV
@@ -104,6 +145,6 @@ if __name__ == "__main__":
     # Task 5: Fetch 5 Key Schemes
     fetch_key_schemes()
     
-    # Task 6 & 7: Profile and validate (Will check if fund_master.csv exists)
+    # Task 6 & 7: Profile and validate (Checks fund master)
     master_df = explore_fund_master()
     validate_amfi_codes(master_df, hdfc_df)
