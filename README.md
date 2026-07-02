@@ -1,4 +1,5 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
 # Bluestock ETL (Mutual Fund Data + Live NAV Fetch)
 
 A small ETL-style Python project to work with mutual-fund datasets stored as CSV files in `data/raw/`, including utilities to fetch live NAV history from **mfapi.in** and to quickly profile datasets.
@@ -167,3 +168,6 @@ Add your license here (e.g., MIT).
 =======
 # BLUESTOCK-ETL
 >>>>>>> 277ef20 (Merge branch 'main' of https://github.com/darshanshirahatti/BLUESTOCK-ETL)
+=======
+# BLUESTOCK-ETL
+>>>>>>> 277ef20e68bdf226f9f6e7097b4ae9089317716c
