@@ -8,18 +8,19 @@ DROP TABLE IF EXISTS fact_aum;
 DROP TABLE IF EXISTS dim_fund;
 DROP TABLE IF EXISTS dim_date;
 
--- 1. Dimensions
+-- 1. Updated Dimensions to accommodate your clean master data layout
 CREATE TABLE dim_fund (
     amfi_code INTEGER PRIMARY KEY,
     fund_house TEXT NOT NULL,
     scheme_name TEXT NOT NULL,
     category TEXT,
     sub_category TEXT,
-    risk_grade TEXT
+    risk_grade TEXT,
+    plan TEXT -- Added to match your clean data structure!
 );
 
 CREATE TABLE dim_date (
-    date_key TEXT PRIMARY KEY, -- Format: YYYY-MM-DD
+    date_key TEXT PRIMARY KEY, 
     year INTEGER,
     month INTEGER,
     month_name TEXT,
@@ -27,7 +28,7 @@ CREATE TABLE dim_date (
     day_of_week TEXT
 );
 
--- 2. Facts
+-- 2. Fact Tables (Keep these exactly as they were)
 CREATE TABLE fact_nav (
     nav_id INTEGER PRIMARY KEY AUTOINCREMENT,
     amfi_code INTEGER,

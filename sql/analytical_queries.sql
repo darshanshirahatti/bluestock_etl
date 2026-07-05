@@ -1,31 +1,38 @@
--- Query 1: Top 5 Funds by Highest Average NAV Asset Value
-SELECT amfi_code, AVG(nav) as avg_nav FROM fact_nav GROUP BY amfi_code ORDER BY avg_nav DESC LIMIT 5;
+-- sql/queries.sql
 
--- Query 2: Average Historical NAV Per Month
-SELECT d.year, d.month, f.amfi_code, AVG(f.nav) as monthly_avg_nav 
-FROM fact_nav f JOIN dim_date d ON f.date_id = d.date_id GROUP BY d.year, d.month, f.amfi_code;
+-- 1. Top 5 funds by highest AUM Asset Allocation
+SELECT amfi_code, aum_amount FROM fact_aum ORDER BY aum_amount DESC LIMIT 5;
 
--- Query 3: Total Transaction Volume Split Across Categories
-SELECT transaction_type, COUNT(*) as tx_count, SUM(amount_inr) as total_volume FROM fact_transactions GROUP BY transaction_type;
+-- 2. Average NAV valuation trends computed per month per fund
+SELECT amfi_code, strftime('%Y-%m', date_key) AS execution_month, AVG(nav) AS average_nav 
+FROM fact_nav GROUP BY amfi_code, execution_month;
 
--- Query 4: Transactions Dense Tracking Grouped by State Codes
-SELECT state, SUM(amount_inr) as state_total FROM fact_transactions GROUP BY state ORDER BY state_total DESC;
+-- 3. Systematic Investment Plan (SIP) Year-over-Year (YoY) Gross Growth Metrics
+SELECT d.year, SUM(t.amount) AS total_sip_capital 
+FROM fact_transactions t 
+JOIN dim_date d ON t.transaction_date = d.date_key 
+WHERE t.transaction_type = 'SIP' GROUP BY d.year;
 
--- Query 5: Mutual Fund Schemes presenting Low Expense Ratios (< 1%)
-SELECT amfi_code, scheme_name, expense_ratio_pct FROM dim_fund WHERE expense_ratio_pct < 1.0;
+-- 4. Gross cumulative transaction sizing spread across geographical states
+SELECT state, SUM(amount) AS geographical_gross_sales, COUNT(transaction_id) AS velocity 
+FROM fact_transactions GROUP BY state ORDER BY geographical_gross_sales DESC;
 
--- Query 6: Counts of Transactions Flagged with Incomplete/Pending KYC
-SELECT kyc_status, COUNT(*) as count FROM fact_transactions GROUP BY kyc_status;
+-- 5. Cost competitive operations list (Funds with Expense Ratio < 1%)
+SELECT amfi_code, expense_ratio FROM fact_performance WHERE expense_ratio < 1.0;
 
--- Query 7: Weekday vs Weekend Trading Volume Inflows
-SELECT d.is_weekday, COUNT(*) as total_transactions FROM fact_transactions t 
-JOIN dim_date d ON strftime('%Y%m%d', t.transaction_date) = d.date_id GROUP BY d.is_weekday;
+-- 6. Total portfolio validation exposure categorized across fund risk grades
+SELECT f.risk_grade, COUNT(t.transaction_id) AS transaction_count, SUM(t.amount) AS pooled_capital
+FROM fact_transactions t JOIN dim_fund f ON t.amfi_code = f.amfi_code GROUP BY f.risk_grade;
 
--- Query 8: Maximum Peak Peak NAV Witnessed per Mutual Fund Scheme
-SELECT amfi_code, MAX(nav) as peak_nav FROM fact_nav GROUP BY amfi_code;
+-- 7. High-Priority compliance tracking list (Identified KYC Unverified profiles)
+SELECT investor_id, amfi_code, amount FROM fact_transactions WHERE kyc_status = 'No';
 
--- Query 9: High Risk Scheme Volume Distribution
-SELECT risk_category, COUNT(*) as fund_count FROM dim_fund GROUP BY risk_category;
+-- 8. Top 5 highest performing funds based on 5-Year annualized yield return calculations
+SELECT amfi_code, return_5y FROM fact_performance ORDER BY return_5y DESC LIMIT 5;
 
--- Query 10: Total Capital Volume Aggregated per Investment Instrument Type
-SELECT transaction_type, AVG(amount_inr) as average_ticket_size FROM fact_transactions GROUP BY transaction_type;
+-- 9. Complete cash outflow metrics calculated based on capital redemptions
+SELECT amfi_code, SUM(amount) AS total_liquidation_outflows 
+FROM fact_transactions WHERE transaction_type = 'Redemption' GROUP BY amfi_code;
+
+-- 10. Active inventory category counts present within the system ecosystem
+SELECT category, COUNT(amfi_code) AS unique_schemes_count FROM dim_fund GROUP BY category;
