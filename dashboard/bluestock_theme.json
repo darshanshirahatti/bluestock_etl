@@ -1,0 +1,30 @@
+{
+    "name": "Bluestock Executive UI",
+    "dataColors": [
+        "#0A2540",
+        "#635BFF",
+        "#00D4B2",
+        "#FF6B6B",
+        "#20639B",
+        "#F6F9FC"
+    ],
+    "background": "#FFFFFF",
+    "foreground": "#0A2540",
+    "tableAccent": "#635BFF",
+    "visualStyles": {
+        "*": {
+            "*": {
+                "*": [
+                    {
+                        "fontFamily": "Segoe UI"
+                    }
+                ],
+                "wordWrap": [
+                    {
+                        "show": true
+                    }
+                ]
+            }
+        }
+    }
+}
